@@ -3,6 +3,8 @@
 
 ## Question 1
 
+cf. [Notebook](Question1.ipynb) pour l'implémentation complète.
+
 ### Modélisation
 
 Soit $P = |\texttt{pros}(x, y)$| et $C = |\texttt{cons}(x, y)$| <br>
