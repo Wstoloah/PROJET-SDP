@@ -147,6 +147,15 @@ def solve_1m_explanation(pros: Dict[int, float], cons: Dict[int, float], verbose
     return result
 
 
+def compute_dynamic_bigM(pros: Dict[int, float], cons: Dict[int, float]) -> float:
+    """
+    Calculates an adaptive Big-M to avoid numerical issues.
+    Big-M = sum of all absolute values of cons + 1
+    """
+    total_negative = sum(abs(c) for c in cons.values())
+    return total_negative + 1
+
+
 def solve_m1_explanation(pros: Dict[int, float], cons: Dict[int, float], verbose: bool = True) -> dict:
     """
     Solve for (m-1) explanation: multiple pros cover one con.
@@ -216,12 +225,20 @@ def solve_m1_explanation(pros: Dict[int, float], cons: Dict[int, float], verbose
 def solve_hybrid_explanation(pros: Dict[int, float], cons: Dict[int, float], verbose: bool = True) -> dict:
     """
     Solve for hybrid explanation: combination of (1-m) and (m-1) trade-offs.
+    Uses dynamic Big-M calculation and minimum participation constraints.
     """
     if not pros or not cons:
         return {"status": "trivial", "message": "No pros or cons to explain"}
     
     m = Model("Hybrid_Explanation")
     m.setParam('OutputFlag', 0)
+    
+    # Calculate adaptive Big-M
+    BIG_M = compute_dynamic_bigM(pros, cons)
+    EPSILON = 0.01
+    
+    if verbose:
+        print(f"Dynamic Big-M calculated: {BIG_M:.3f}")
     
     # Variables
     # Assignment variables
@@ -239,14 +256,14 @@ def solve_hybrid_explanation(pros: Dict[int, float], cons: Dict[int, float], ver
     for c in cons:
         m.addConstr(
             VarPivotCon[c] + quicksum(VarAssignPro[(p, c)] for p in pros) == 1,
-            name=f"con_coverage_{c}"
+            name=f"coverage_con_{c}"
         )
     
     # 2. Every pro can be used at most once (either as 1-m pivot or assigned to m-1 pivot)
     for p in pros:
         m.addConstr(
             VarPivotPro[p] + quicksum(VarAssignCon[(p, c)] for c in cons) <= 1,
-            name=f"pro_usage_{p}"
+            name=f"usage_pro_{p}"
         )
     
     # 3. Linking constraints
@@ -255,14 +272,28 @@ def solve_hybrid_explanation(pros: Dict[int, float], cons: Dict[int, float], ver
             m.addConstr(VarAssignPro[(p, c)] <= VarPivotPro[p], name=f"link_atp_{p}_{c}")
             m.addConstr(VarAssignCon[(p, c)] <= VarPivotCon[c], name=f"link_atc_{p}_{c}")
     
-    # 4. Trade-off validity with Big-M
+    # 4. Minimum participation constraints
+    for p in pros:
+        m.addConstr(
+            quicksum(VarAssignPro[(p, c)] for c in cons) >= VarPivotPro[p],
+            name=f"min_participation_pro_{p}"
+        )
+    
+    for c in cons:
+        m.addConstr(
+            quicksum(VarAssignCon[(p, c)] for p in pros) >= VarPivotCon[c],
+            name=f"min_participation_con_{c}"
+        )
+    
+    # 5. Trade-off validity for (1-m)
     for p in pros:
         m.addConstr(
             pros[p] + quicksum(VarAssignPro[(p, c)] * cons[c] for c in cons)
-            >= VarPivotPro[p] * EPSILON - (1 - VarPivotPro[p]) * BIG_M,
+            >= VarPivotPro[p] * EPSILON,
             name=f"validity_1m_{p}"
         )
     
+    # 6. Trade-off validity for (m-1) with Big-M
     for c in cons:
         m.addConstr(
             cons[c] + quicksum(VarAssignCon[(p, c)] * pros[p] for p in pros)
