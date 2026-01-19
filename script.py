@@ -488,24 +488,3 @@ def find_explanation(
     else:
         raise ValueError(f"Unknown explanation type: {explanation_type}")
 
-
-# Example usage
-if __name__ == "__main__":
-    # Example records
-    record1 = [85, 81, 71, 69, 75, 81, 88]
-    record2 = [81, 81, 75, 63, 67, 88, 95]
-    
-    print("\n" + "#" * 80)
-    print("# EXAMPLE: Testing (1-m) explanation")
-    print("#" * 80)
-    result = find_explanation(record1, record2, explanation_type="1-m")
-    
-    print("\n" + "#" * 80)
-    print("# EXAMPLE: Testing (m-1) explanation")
-    print("#" * 80)
-    result = find_explanation(record1, record2, explanation_type="m-1")
-    
-    print("\n" + "#" * 80)
-    print("# EXAMPLE: Testing hybrid explanation")
-    print("#" * 80)
-    result = find_explanation(record1, record2, explanation_type=["1-m", "m-1"])
